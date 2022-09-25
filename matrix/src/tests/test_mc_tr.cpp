@@ -4,10 +4,11 @@
 template <typename T>
 using Matrix = mxnv::Matrix<T>;
 
-TEST(MatrixNative, StaticCorrectMult)
+template <typename M>
+void Test_MatrixNative_StaticCorrectMult()
 {
     {
-        Matrix<int> a{2, 2}, b{2, 1}, res{2, 1};
+        M a{2, 2}, b{2, 1}, res{2, 1};
         
         a[0][0] = 1; a[0][1] = 2;
         a[1][0] = 3; a[1][1] = 4;
@@ -23,7 +24,7 @@ TEST(MatrixNative, StaticCorrectMult)
     }
 
     {
-        Matrix<int> a{1, 2}, b{2, 1}, res{1, 1};
+        M a{1, 2}, b{2, 1}, res{1, 1};
         
         a[0][0] = 3; a[0][1] = -2;
 
@@ -37,10 +38,10 @@ TEST(MatrixNative, StaticCorrectMult)
     }
 }
 
-
-TEST(MatrixNative, IdentityMult)
+template <typename M>
+void Test_MatrixNative_IdentityMult()
 {
-    Matrix<int> a{10, 200}, b{200, 17}, res{10, 17};
+    M a{10, 200}, b{200, 17}, res{10, 17};
 
     auto fill_ident = [](auto& m)
     {
@@ -57,4 +58,16 @@ TEST(MatrixNative, IdentityMult)
     
     a *= b;
     ASSERT_EQ(a, res);
+}
+
+TEST(MatrixNative, Static)
+{
+    Test_MatrixNative_StaticCorrectMult<mxnv::Matrix<long>>();
+    Test_MatrixNative_IdentityMult<mxnv::Matrix<long>>();
+}
+
+TEST(MatrixCacheLike, Static)
+{
+    Test_MatrixNative_StaticCorrectMult<mxtr::Matrix<long>>();
+    Test_MatrixNative_IdentityMult<mxtr::Matrix<long>>();
 }
