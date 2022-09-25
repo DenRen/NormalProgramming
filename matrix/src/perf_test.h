@@ -6,9 +6,8 @@
 #include "matrix.h"
 
 template <typename M>
-std::size_t PerfTest(const M& matrix_lhs, const M& matrix_rhs)
+std::size_t PerfTest(const M& matrix_lhs, const M& matrix_rhs, const std::size_t num_repeats)
 {
-    constexpr auto num_repeats = 10;
     std::vector<M> ls(num_repeats, matrix_lhs), rs(num_repeats, matrix_rhs);
 
     auto time_begin = std::chrono::high_resolution_clock::now();

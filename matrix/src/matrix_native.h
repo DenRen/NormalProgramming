@@ -58,7 +58,6 @@ private:
 private:
     PositionT m_num_rows, m_num_cols;
     std::vector<T> m_buf;
-    mutable bool m_is_transposed {false};
 };
 
 template <typename T>
