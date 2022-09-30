@@ -241,30 +241,27 @@ void Test_MatrixNative_IdentityMult()
     IS_EQUAL(a, res);
 }
 
-TEST(MatrixNative, Static)
+template <template <typename> typename M>
+void TestStatic()
 {
-    Test_Matrix_StaticCorrectMult<mxnv::Matrix, int>();
-    Test_Matrix_StaticCorrectMult<mxnv::Matrix, long>();
-    Test_Matrix_StaticCorrectMult<mxnv::Matrix, long long>();
+    Test_Matrix_StaticCorrectMult<M, int>();
+    Test_Matrix_StaticCorrectMult<M, long>();
+    Test_Matrix_StaticCorrectMult<M, long long>();
 
     for (float delim = 1; delim < 50; delim += 2)
     {
-        Test_Matrix_StaticCorrectMult<mxnv::Matrix, float>(delim);
-        Test_Matrix_StaticCorrectMult<mxnv::Matrix, double>(delim);
+        Test_Matrix_StaticCorrectMult<M, float>(delim);
+        Test_Matrix_StaticCorrectMult<M, double>(delim);
     }
-    Test_MatrixNative_IdentityMult<mxnv::Matrix<long>>();
+    Test_MatrixNative_IdentityMult<M<long>>();
+}
+
+TEST(MatrixNative, Static)
+{
+    TestStatic<mxnv::Matrix>();
 }
 
 TEST(MatrixNativeTranspose, Static)
 {
-    Test_Matrix_StaticCorrectMult<mxtr::Matrix, int>();
-    Test_Matrix_StaticCorrectMult<mxtr::Matrix, long>();
-    Test_Matrix_StaticCorrectMult<mxtr::Matrix, long long>();
-
-    for (float delim = 1; delim < 50; delim += 2)
-    {
-        Test_Matrix_StaticCorrectMult<mxtr::Matrix, float>(delim);
-        Test_Matrix_StaticCorrectMult<mxtr::Matrix, double>(delim);
-    }
-    Test_MatrixNative_IdentityMult<mxtr::Matrix<long>>();
+    TestStatic<mxtr::Matrix>();
 }
