@@ -131,18 +131,19 @@ std::ostream& operator <<(std::ostream& os, const Matrix<T>& matrix)
     const std::size_t num_cols = matrix.GetNumCols();
     const std::size_t num_rows = matrix.GetNumRows();
 
+    os << '{';
     for (std::size_t i_row = 0; i_row < num_rows; ++i_row)
     {
         const auto& row = matrix[i_row];
         os << row[0];
         for (std::size_t i_col = 1; i_col < num_cols; ++i_col)
         {
-            os << ' ' << row[i_col];
+            os << ',' << row[i_col];
         }
-        os << '\n';
+        os << ';';
     }
 
-    return os;
+    return os << '}';
 }
 
 template <typename T>
