@@ -14,8 +14,8 @@ constexpr mxcmn::SizeT QMatrixSize = 64;
 template <typename T>
 using MatrixT = mxcl::Matrix<T, QMatrixSize>;
 
-template <typename M>
-auto GetRandomSquareMatrix(const mxcmn::SizeT num_rows_cols)
+template <typename M, typename... Args>
+auto GetRandomSquareMatrix(const mxcmn::SizeT num_rows_cols, Args... args)
 {
     const auto size = num_rows_cols;
     M m{size, size};
@@ -26,7 +26,7 @@ auto GetRandomSquareMatrix(const mxcmn::SizeT num_rows_cols)
         for (mxcmn::PositionT i_col = 0; i_col < size; ++i_col)
         {
             using ValueT = std::remove_cv_t<std::remove_reference_t<decltype(m[0][0])>>;
-            m[i_row][i_col] = rand.get_rand_val<ValueT>();
+            m[i_row][i_col] = rand.get_rand_val<ValueT>(args...);
         }
     }
 
@@ -61,8 +61,8 @@ TEST(MatrixCacheLike, RandomTest)
         for (std::size_t i_step = 1; i_step <= num_step; ++i_step)
         {
             const auto num_row = i_step * num_row_min;
-            auto a = GetRandomSquareMatrix<MatrixT<long>>(num_row);
-            auto b = GetRandomSquareMatrix<MatrixT<long>>(num_row);
+            auto a = GetRandomSquareMatrix<MatrixT<long>>(num_row, -1, 1);
+            auto b = GetRandomSquareMatrix<MatrixT<long>>(num_row, -1, 1);
 
             auto a_ref = CreateRefMatrix(a);
             auto b_ref = CreateRefMatrix(b);

@@ -7,7 +7,7 @@
 #include <string>
 
 template <typename M>
-double PerfTest(const M& matrix_lhs, const M& matrix_rhs, const std::size_t num_repeats)
+double RunPerfTest(const M& matrix_lhs, const M& matrix_rhs, const std::size_t num_repeats)
 {
     std::vector<M> ls(num_repeats, matrix_lhs), rs(num_repeats, matrix_rhs);
 

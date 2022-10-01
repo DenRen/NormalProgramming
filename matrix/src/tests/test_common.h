@@ -6,8 +6,8 @@
         const auto [num_rows, num_cols] = GetNumRowsCols(lhs);                                         \
                                                                                                        \
         {                                                                                              \
-            ASSERT_EQ(num_rows, rhs.GetNumRows()) << lhs << rhs;                                       \
-            ASSERT_EQ(num_cols, rhs.GetNumCols()) << lhs << rhs;                                       \
+            ASSERT_EQ(num_rows, rhs.GetNumRows());                                                     \
+            ASSERT_EQ(num_cols, rhs.GetNumCols());                                                     \
         }                                                                                              \
                                                                                                        \
         for (mxcmn::PositionT i_row = 0; i_row < num_rows; ++i_row)                                    \
