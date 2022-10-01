@@ -1,6 +1,8 @@
 #include <type_traits>
 
 #include "gtest/gtest.h"
+
+#include "test_common.h"
 #include "../matrix.h"
 
 template <typename T>
@@ -9,15 +11,11 @@ using Matrix = mxnv::Matrix<T>;
 template <template <typename> typename M, typename T>
 void Divide(M<T> &m, T delim)
 {
-    const auto num_rows = m.GetNumRows();
-    const auto num_cols = m.GetNumCols();
+    const auto [num_rows, num_cols] = GetNumRowsCols(m);
 
-    using i_row_t = std::remove_cv_t<decltype(num_rows)>;
-    using i_col_t = std::remove_cv_t<decltype(num_cols)>;
-
-    for (i_row_t i_row = 0; i_row < num_rows; ++i_row)
+    for (mxcmn::PositionT i_row = 0; i_row < num_rows; ++i_row)
     {
-        for (i_col_t i_col = 0; i_col < num_cols; ++i_col)
+        for (mxcmn::PositionT i_col = 0; i_col < num_cols; ++i_col)
         {
             m[i_row][i_col] /= delim;
         }
@@ -51,50 +49,6 @@ void Divide(M1<T> &m1, M2<T> &m2, M3<T> &m3, M4<T> &m4, T delim)
     Divide(m4, delim);
 }
 
-#define IS_EQUAL(lhs, rhs)                                                                             \
-    do                                                                                                 \
-    {                                                                                                  \
-        const auto num_rows = lhs.GetNumRows();                                                        \
-        const auto num_cols = lhs.GetNumCols();                                                        \
-                                                                                                       \
-        {                                                                                              \
-            ASSERT_EQ(num_rows, rhs.GetNumRows()) << lhs << rhs;                                       \
-            ASSERT_EQ(num_cols, rhs.GetNumCols()) << lhs << rhs;                                       \
-        }                                                                                              \
-                                                                                                       \
-        using i_row_t = std::remove_cv_t<decltype(num_rows)>;                                          \
-        using i_col_t = std::remove_cv_t<decltype(num_cols)>;                                          \
-                                                                                                       \
-        for (i_row_t i_row = 0; i_row < num_rows; ++i_row)                                             \
-        {                                                                                              \
-            for (i_col_t i_col = 0; i_col < num_cols; ++i_col)                                         \
-            {                                                                                          \
-                const auto &lhs_value = lhs[i_row][i_col];                                             \
-                const auto &rhs_value = rhs[i_row][i_col];                                             \
-                                                                                                       \
-                using lhs_value_t = std::remove_const_t<std::remove_reference_t<decltype(lhs_value)>>; \
-                using rhs_value_t = std::remove_const_t<std::remove_reference_t<decltype(rhs_value)>>; \
-                using common_t = std::common_type_t<lhs_value_t, rhs_value_t>;                         \
-                                                                                                       \
-                if constexpr (std::is_floating_point_v<common_t>)                                      \
-                {                                                                                      \
-                    if constexpr (std::is_same_v<common_t, float>)                                     \
-                    {                                                                                  \
-                        ASSERT_FLOAT_EQ(lhs_value, rhs_value) << lhs << rhs;                           \
-                    }                                                                                  \
-                    else                                                                               \
-                    {                                                                                  \
-                        ASSERT_DOUBLE_EQ(lhs_value, rhs_value) << lhs << rhs;                          \
-                    }                                                                                  \
-                }                                                                                      \
-                else                                                                                   \
-                {                                                                                      \
-                    ASSERT_EQ(lhs_value, rhs_value) << lhs << rhs;                                     \
-                }                                                                                      \
-            }                                                                                          \
-        }                                                                                              \
-    } while (0)
-
 template <template <typename> typename M, typename T>
 void Test_Matrix_StaticCorrectMult(T delim = 1)
 {
@@ -115,7 +69,7 @@ void Test_Matrix_StaticCorrectMult(T delim = 1)
 
         Divide(m, res, res, delim);
         m *= m;
-        IS_EQUAL(m, res);
+        MATRIX_IS_EQ(m, res);
         return;
         // Test 2
         m[0][0] = -15;
@@ -130,7 +84,7 @@ void Test_Matrix_StaticCorrectMult(T delim = 1)
 
         Divide(m, res, res, delim);
         m *= m;
-        IS_EQUAL(m, res);
+        MATRIX_IS_EQ(m, res);
 
         // Test 3
         m[0][0] = -15;
@@ -145,7 +99,7 @@ void Test_Matrix_StaticCorrectMult(T delim = 1)
 
         Divide(m, res, res, delim);
         m *= m;
-        IS_EQUAL(m, res);
+        MATRIX_IS_EQ(m, res);
     }
 
     // Mult of 2x2 * 2x1 = 2x2
@@ -165,7 +119,7 @@ void Test_Matrix_StaticCorrectMult(T delim = 1)
 
         Divide(a, b, res, res, delim);
         a *= b;
-        IS_EQUAL(a, res);
+        MATRIX_IS_EQ(a, res);
     }
 
     // Mult of 1x2 * 2x1 = 1x1
@@ -182,7 +136,7 @@ void Test_Matrix_StaticCorrectMult(T delim = 1)
 
         Divide(a, b, res, res, delim);
         a *= b;
-        IS_EQUAL(a, res);
+        MATRIX_IS_EQ(a, res);
     }
 
     // Mult of 3x2 * 2x3 = 3x3
@@ -215,7 +169,7 @@ void Test_Matrix_StaticCorrectMult(T delim = 1)
 
         Divide(a, b, res, res, delim);
         a *= b;
-        IS_EQUAL(a, res);
+        MATRIX_IS_EQ(a, res);
     }
 }
 
@@ -238,7 +192,7 @@ void Test_MatrixNative_IdentityMult()
     fill_ident(res);
 
     a *= b;
-    IS_EQUAL(a, res);
+    MATRIX_IS_EQ(a, res);
 }
 
 template <template <typename> typename M>
