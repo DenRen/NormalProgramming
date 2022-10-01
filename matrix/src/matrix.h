@@ -2,8 +2,8 @@
 
 namespace mxcmn
 {
-    using PositionT = unsigned;
-    using SizeT = unsigned;
+using PositionT = unsigned;
+using SizeT = unsigned;
 }
 
 #include "matrix_native.h"

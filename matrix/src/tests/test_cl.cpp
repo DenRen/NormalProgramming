@@ -64,26 +64,26 @@ TEST(MatrixCacheLike, RandomTest)
             auto a = GetRandomSquareMatrix<MatrixT<long>>(num_row);
             auto b = GetRandomSquareMatrix<MatrixT<long>>(num_row);
 
-            auto a_native = CreateRefMatrix(a);
-            auto b_native = CreateRefMatrix(b);
+            auto a_ref = CreateRefMatrix(a);
+            auto b_ref = CreateRefMatrix(b);
 
             for (int i_op = 0; i_op < 3; ++i_op)
             {
                 a *= b;
-                a_native *= b_native;
-                MATRIX_IS_EQ(a, a_native);
+                a_ref *= b_ref;
+                MATRIX_IS_EQ(a, a_ref);
 
                 a *= a;
-                a_native *= a_native;
-                MATRIX_IS_EQ(a, a_native);
+                a_ref *= a_ref;
+                MATRIX_IS_EQ(a, a_ref);
 
                 b *= a;
-                b_native *= a_native;
-                MATRIX_IS_EQ(b, b_native);
+                b_ref *= a_ref;
+                MATRIX_IS_EQ(b, b_ref);
 
                 b *= b;
-                b_native *= b_native;
-                MATRIX_IS_EQ(b, b_native);
+                b_ref *= b_ref;
+                MATRIX_IS_EQ(b, b_ref);
             }
         }
     }
