@@ -28,9 +28,8 @@ void TimeSizeForNativeAndCacheLike(std::vector<std::pair<unsigned, unsigned>>& t
     perf_test.Run<MatrixCacheLike>(fs_cachelike);
 }
 
-// #define TIME_SIZE
+#define TIME_SIZE
 #define TIME_NUM_THREADS
-
 
 template <typename ValueT>
 void TimeNumThreadsForNativeAndCacheLike(int num_threads_min, int num_threads_max,

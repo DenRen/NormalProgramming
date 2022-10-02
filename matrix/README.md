@@ -23,3 +23,17 @@ make -j$(nproc)
 ./run_test_matrix
 ./matrix
 ```
+## How to generate data for graphics
+Build, use instruction above
+```bash
+cd build
+./graphics
+cp time_* ../results
+```
+
+## How to plot graphics
+```bash
+cd scripts
+./plot.py
+
+```
