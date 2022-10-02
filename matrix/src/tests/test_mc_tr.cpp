@@ -219,3 +219,8 @@ TEST(MatrixNativeTranspose, Static)
 {
     TestStatic<mxtr::Matrix>();
 }
+
+TEST(MatrixNativeParallel, Static)
+{
+    TestStatic<mxnvpl::Matrix>();
+}

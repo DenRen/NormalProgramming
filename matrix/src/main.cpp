@@ -63,6 +63,10 @@ void VsAll(const std::vector<std::pair<unsigned, unsigned>>& test_conf)
     test_times.push_back(perf_test.Run<mxcl::Matrix<ValueT, 64>>());
     std::cout << std::endl;
 
+    std::cout << "native parallel:" << std::endl;
+    test_times.push_back(perf_test.Run<mxnvpl::Matrix<ValueT>>());
+    std::cout << std::endl;
+
     std::cout << "cache like parallel:" << std::endl;
     test_times.push_back(perf_test.Run<mxclpl::Matrix<ValueT, 64>>());
     std::cout << std::endl;
