@@ -1,37 +1,5 @@
-#include <iostream>
-#include <iomanip>
 #include "matrix.h"
 #include "perf_test.h"
-
-class PerfTest
-{
-public:
-    // test_conf: { num_cols, num_test_repeats }
-    PerfTest(const std::vector<std::pair<unsigned, unsigned>>& test_conf)
-        : m_test_conf(test_conf)
-    {}
-
-    template <typename M>
-    std::vector<double> Run()
-    {
-        std::vector<double> res_time;
-        for (const auto [num_cols, num_repeats] : m_test_conf)
-        {
-            std::cout << std::setw(5) << num_cols << ' ';
-            std::flush(std::cout);
-
-            M a{ num_cols, num_cols }, b{ num_cols, num_cols };
-
-            res_time.push_back(RunPerfTest(a, b, num_repeats));
-            std::cout << *res_time.crbegin() << std::endl;
-        }
-
-        return res_time;
-    }
-
-private:
-    std::vector<std::pair<unsigned, unsigned>> m_test_conf;
-};
 
 template <typename ValueT>
 void VsAll(const std::vector<std::pair<unsigned, unsigned>>& test_conf)

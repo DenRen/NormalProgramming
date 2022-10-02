@@ -2,8 +2,9 @@
 
 #include <stdexcept>
 #include <vector>
-#include <iosfwd>
 #include <thread>
+#include <iostream>
+#include <iosfwd>
 
 #include "qmatrix.h"
 

@@ -12,6 +12,13 @@ target_link_options(${PROJECT_NAME} PRIVATE -Ofast)
 # target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
 # target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
 
+# Graphics --------------------------------------------------------------------
+project(graphics)
+
+add_executable(${PROJECT_NAME} "src/graphics.cpp")
+target_compile_options(${PROJECT_NAME} PRIVATE -Ofast)
+target_link_options(${PROJECT_NAME} PRIVATE -Ofast)
+
 # Tests -----------------------------------------------------------------------
 set(PROJECT_TEST_NAME "run_test_${PROJECT_NAME}")
 project(${PROJECT_TEST_NAME})

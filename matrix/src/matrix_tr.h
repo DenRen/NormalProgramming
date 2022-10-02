@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <vector>
 #include <iosfwd>
+#include <iostream>
 
 namespace mxtr
 {

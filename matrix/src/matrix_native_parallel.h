@@ -2,8 +2,9 @@
 
 #include <stdexcept>
 #include <vector>
-#include <iosfwd>
 #include <thread>
+#include <iosfwd>
+#include <iostream>
 
 namespace mxnvpl
 {
