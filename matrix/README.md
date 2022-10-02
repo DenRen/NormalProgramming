@@ -18,8 +18,7 @@ sudo apt install -y make cmake clang-14
 mkdir build
 cd build
 cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_COMPILER=/usr/bin/clang++-14
+    -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 ./run_test_matrix
 ./matrix

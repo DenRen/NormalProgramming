@@ -25,16 +25,16 @@
                 {                                                                                      \
                     if constexpr (std::is_same_v<common_t, float>)                                     \
                     {                                                                                  \
-                        ASSERT_FLOAT_EQ(lhs_value, rhs_value) << lhs << rhs;                           \
+                        ASSERT_FLOAT_EQ(lhs_value, rhs_value) << "float cmp" << lhs << rhs;            \
                     }                                                                                  \
                     else                                                                               \
                     {                                                                                  \
-                        ASSERT_DOUBLE_EQ(lhs_value, rhs_value) << lhs << rhs;                          \
+                        ASSERT_FLOAT_EQ(lhs_value, rhs_value) << "double cmp" << lhs << rhs;          \
                     }                                                                                  \
                 }                                                                                      \
                 else                                                                                   \
                 {                                                                                      \
-                    ASSERT_EQ(lhs_value, rhs_value) << lhs << rhs;                                     \
+                    ASSERT_EQ(lhs_value, rhs_value) << "== cmp" << lhs << rhs;                         \
                 }                                                                                      \
             }                                                                                          \
         }                                                                                              \

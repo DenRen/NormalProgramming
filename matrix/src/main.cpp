@@ -29,23 +29,13 @@ public:
         return res_time;
     }
 
-
 private:
     std::vector<std::pair<unsigned, unsigned>> m_test_conf;
 };
 
-int main()
+template <typename ValueT>
+void VsAll(const std::vector<std::pair<unsigned, unsigned>>& test_conf)
 {
-    // { num_cols, num_test_repeats }
-    std::vector<std::pair<unsigned, unsigned>> test_conf = {
-        { 20 * 64, 2 },
-        { 21 * 64, 2 },
-        { 22 * 64, 1 },
-        { 24 * 64, 3 },
-        { 25 * 64, 1 }
-    };
-    using ValueT = double;
-
     // Print test conf
     std::ios_base::sync_with_stdio(false);
     std::cout << "Test conf:" << std::endl;
@@ -53,7 +43,7 @@ int main()
     {
         const std::size_t size_bytes = num_cols * num_cols * sizeof(ValueT);
         const std::size_t size_Mbytes = size_bytes >> 20ul;
-        std::cout << "  " << size_Mbytes << " Mbyte" << std::endl;
+        std::cout << " " << num_cols << 'x' << num_cols << ": " << size_Mbytes << " Mbyte" << std::endl;
     }
     std::cout << std::endl;
 
@@ -73,6 +63,10 @@ int main()
     test_times.push_back(perf_test.Run<mxcl::Matrix<ValueT, 64>>());
     std::cout << std::endl;
 
+    std::cout << "cache like parallel:" << std::endl;
+    test_times.push_back(perf_test.Run<mxclpl::Matrix<ValueT, 64>>());
+    std::cout << std::endl;
+
     // Analyze results
     std::cout << "Speed-up:" << std::endl;
     const auto& time_native = test_times[0];
@@ -90,4 +84,25 @@ int main()
         }
         std::cout << std::endl;
     }
+}
+
+int main()
+{
+    // { num_cols, num_test_repeats }
+    std::vector<std::pair<unsigned, unsigned>> test_conf = {
+        { 20 * 64, 2 },
+        { 21 * 64, 2 },
+        { 22 * 64, 1 },
+        { 24 * 64, 1 },
+        { 25 * 64, 1 }
+    };
+    using ValueT = double;
+
+#if 1
+    VsAll<ValueT>(test_conf);
+#else
+    PerfTest perf_test {test_conf};
+    auto time = perf_test.Run<mxclpl::Matrix<ValueT, 64>>();
+    // auto time = perf_test.Run<mxtr::Matrix<ValueT>>();
+#endif
 }

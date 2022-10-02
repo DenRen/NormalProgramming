@@ -5,6 +5,12 @@ set(CMAKE_CXX_STANDARD 17)
 add_compile_options(-Ofast -march=x86-64-v3)
 
 add_executable(${PROJECT_NAME} "src/main.cpp")
+target_compile_options(${PROJECT_NAME} PRIVATE -Ofast)
+target_link_options(${PROJECT_NAME} PRIVATE -Ofast)
+
+## Enable ASAN
+# target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
+# target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
 
 # Tests -----------------------------------------------------------------------
 set(PROJECT_TEST_NAME "run_test_${PROJECT_NAME}")

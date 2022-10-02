@@ -157,24 +157,40 @@ namespace seclib {
         }
 
         template <typename T>
-        std::enable_if_t <std::is_integral_v <T>, T>
+        T
         get_rand_val (T mod) {
-            return get_rand_val <T> () % mod;
-        }
-
-        template <typename T>
-        std::enable_if_t <std::is_floating_point_v <T>, T>
-        get_rand_val (T mod) {
-            T val =  get_rand_val <T> () / 100000;
-            val = val - mod * std::trunc (val / mod);
-            return val;
+            if constexpr (std::is_unsigned_v<T>)
+            {
+                return get_rand_val(T{0}, mod);
+            }
+            else
+            {
+                return get_rand_val(-mod, +mod);
+            }
         }
 
         template <typename T>
         T
         get_rand_val (T min,
                       T max) {
-            return min + get_rand_val <T> (max + 1 - min);
+            if constexpr (std::is_floating_point_v<T>)
+            {
+                auto dist = std::uniform_real_distribution<T>(min, max);
+                if constexpr (sizeof (T) <= 4) {
+                    return dist(rand_);
+                } else {
+                    return dist(rand_64_);
+                }
+            }
+            else
+            {
+                auto dist = std::uniform_int_distribution<T>(min, max);
+                if constexpr (sizeof (T) <= 4) {
+                    return dist(rand_);
+                } else {
+                    return dist(rand_64_);
+                }
+            }
         }
 
         template <typename T>

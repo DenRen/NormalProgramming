@@ -17,7 +17,7 @@ double RunPerfTest(const M& matrix_lhs, const M& matrix_rhs, const std::size_t n
         ls[i_repeat] *= rs[i_repeat];
 
         const auto& res = ls[i_repeat];
-        volatile auto tmp = ls[res.GetNumRows() - 1][res.GetNumCols() - 1];
+        volatile auto tmp = res[res.GetNumRows() - 1][res.GetNumCols() - 1];
     }
     auto time_end = std::chrono::high_resolution_clock::now();
 

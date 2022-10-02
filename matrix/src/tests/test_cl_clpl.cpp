@@ -11,9 +11,6 @@ using RefMatrixT = mxtr::Matrix<T>;
 
 constexpr mxcmn::SizeT QMatrixSize = 64;
 
-template <typename T>
-using MatrixT = mxcl::Matrix<T, QMatrixSize>;
-
 template <typename M, typename... Args>
 auto GetRandomSquareMatrix(const mxcmn::SizeT num_rows_cols, Args... args)
 {
@@ -33,12 +30,13 @@ auto GetRandomSquareMatrix(const mxcmn::SizeT num_rows_cols, Args... args)
     return m;
 }
 
-template <typename T, std::size_t QSize>
-auto CreateRefMatrix(const mxcl::Matrix<T, QSize> &m)
+template <typename M>
+auto CreateRefMatrix(const M& m)
 {
     const auto [num_rows, num_cols] = GetNumRowsCols(m);
 
-    RefMatrixT<T> res{num_rows, num_cols};
+    using ValueT = std::remove_cv_t<std::remove_reference_t<decltype(m[0][0])>>;
+    RefMatrixT<ValueT> res{num_rows, num_cols};
     for (mxcmn::PositionT i_row = 0; i_row < num_rows; ++i_row)
     {
         for (mxcmn::PositionT i_col = 0; i_col < num_cols; ++i_col)
@@ -50,7 +48,8 @@ auto CreateRefMatrix(const mxcl::Matrix<T, QSize> &m)
     return res;
 }
 
-TEST(MatrixCacheLike, RandomTest)
+template<typename M>
+void RandomTest()
 {
     const mxcmn::SizeT num_row_min = QMatrixSize;
     const std::size_t num_step = 3;
@@ -61,8 +60,8 @@ TEST(MatrixCacheLike, RandomTest)
         for (std::size_t i_step = 1; i_step <= num_step; ++i_step)
         {
             const auto num_row = i_step * num_row_min;
-            auto a = GetRandomSquareMatrix<MatrixT<long>>(num_row, -1, 1);
-            auto b = GetRandomSquareMatrix<MatrixT<long>>(num_row, -1, 1);
+            auto a = GetRandomSquareMatrix<M>(num_row, -1000, 1000);
+            auto b = GetRandomSquareMatrix<M>(num_row, -1000, 1000);
 
             auto a_ref = CreateRefMatrix(a);
             auto b_ref = CreateRefMatrix(b);
@@ -87,4 +86,18 @@ TEST(MatrixCacheLike, RandomTest)
             }
         }
     }
+}
+
+TEST(MatrixCacheLike, RandomTest)
+{
+    RandomTest <mxcl::Matrix<long,  32>>();
+    RandomTest <mxcl::Matrix<long,  64>>();
+    RandomTest <mxcl::Matrix<long, 128>>();
+}
+
+TEST(MatrixCacheLikeParallel, RandomTest)
+{
+    RandomTest <mxclpl::Matrix<long,  32>>();
+    RandomTest <mxclpl::Matrix<long,  64>>();
+    RandomTest <mxclpl::Matrix<long, 128>>();
 }
