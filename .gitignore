@@ -32,6 +32,3 @@
 *.app
 matrix/.vscode
 matrix/build*
-
-matrix/googletest/
-googletest/

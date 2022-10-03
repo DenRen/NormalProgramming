@@ -10,7 +10,7 @@
 ## Need to install
 ```bash
 sudo apt update
-sudo apt install -y make cmake clang-14
+sudo apt install -y build-essentia gcc make cmake
 ```
 
 ## Build and run

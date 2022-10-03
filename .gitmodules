@@ -1,0 +1,3 @@
+[submodule "matrix/googletest"]
+	path = matrix/googletest
+	url = https://github.com/google/googletest

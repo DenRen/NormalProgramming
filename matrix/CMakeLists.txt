@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.10)
 project(matrix)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -11,13 +11,6 @@ target_link_options(${PROJECT_NAME} PRIVATE -Ofast)
 ## Enable ASAN
 # target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
 # target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=address)
-
-# Graphics --------------------------------------------------------------------
-project(graphics)
-
-add_executable(${PROJECT_NAME} "src/graphics.cpp")
-target_compile_options(${PROJECT_NAME} PRIVATE -Ofast)
-target_link_options(${PROJECT_NAME} PRIVATE -Ofast)
 
 # Tests -----------------------------------------------------------------------
 set(PROJECT_TEST_NAME "run_test_${PROJECT_NAME}")
@@ -37,3 +30,10 @@ target_sources(${PROJECT_TEST_NAME} PUBLIC ${test_srcs})
 
 #Link test executable against gtest and gtest_main
 target_link_libraries (${PROJECT_TEST_NAME} gtest gtest_main)
+
+# Graphics --------------------------------------------------------------------
+project(graphics)
+
+add_executable(${PROJECT_NAME} "src/graphics.cpp")
+target_compile_options(${PROJECT_NAME} PRIVATE -Ofast)
+target_link_options(${PROJECT_NAME} PRIVATE -Ofast)
