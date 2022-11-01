@@ -120,7 +120,7 @@ public:
 
     std::size_t lock()
     {
-        std::size_t i_next = m_i_tail.fetch_add(1, std::memory_order_release) % N;
+        std::size_t i_next = m_i_tail.fetch_add(1, std::memory_order_relaxed) % N;
         while(m_rb[i_next].load(std::memory_order_acquire))
         {
             active_sleep();
@@ -131,7 +131,7 @@ public:
 
     void unlock(size_t i_next)
     {
-        m_rb[i_next].store(true, std::memory_order_release);
+        m_rb[i_next].store(true, std::memory_order_relaxed);
         m_rb[(i_next + 1) % N].store(false, std::memory_order_release);
     }
 };
