@@ -7,8 +7,7 @@ LD  = g++
 RM = rm -rf
 
 OPTIM_FLAGS = -O3
-GTEST_FLAGS = -pthread -g
-OTHER_FLAGS = -MD
+OTHER_FLAGS = -MD -pthread
 
 FLAGS  = $(OPTIM_FLAGS) $(OTHER_FLAGS)
 
