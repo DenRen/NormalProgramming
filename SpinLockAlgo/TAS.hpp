@@ -13,7 +13,8 @@ public:
     void lock() noexcept
     {
         int expected = 0;
-        while(!m_flag.compare_exchange_weak(expected, 1, std::memory_order_relaxed))
+        while(!m_flag.compare_exchange_weak(expected, 1, std::memory_order_acquire,
+                                                         std::memory_order_relaxed))
         {
             active_sleep<ACTIVE_SLEEP::YIELD>();
             expected = 0;
@@ -22,9 +23,6 @@ public:
 
     void unlock() noexcept
     {
-        m_flag.store(0, std::memory_order_relaxed);
+        m_flag.store(0, std::memory_order_release);
     }
 };
-
-// todo: ticket_lock
-// todo: single a.out -> all test with all num_threads
