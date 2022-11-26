@@ -117,7 +117,7 @@ void PrintTimePerfTest(std::size_t counter_end, std::size_t num_repeats, std::si
         
         std::cout << ' ' << dt_ms;
     }
-    std::cout << '\n';
+    std::cout << std::endl;
 }
 
 int main()
@@ -132,14 +132,14 @@ int main()
 
     std::cout << num_repeats - num_skip << '\n';
 
-    PrintTimePerfTest<spin_lock, 1>(counter_end, num_repeats, num_skip);
-    PrintTimePerfTest<spin_lock, 2>(counter_end, num_repeats, num_skip);
-    PrintTimePerfTest<spin_lock, 3>(counter_end, num_repeats, num_skip);
+    // PrintTimePerfTest<spin_lock, 1>(counter_end, num_repeats, num_skip);
+    // PrintTimePerfTest<spin_lock, 2>(counter_end, num_repeats, num_skip);
+    // PrintTimePerfTest<spin_lock, 3>(counter_end, num_repeats, num_skip);
     PrintTimePerfTest<spin_lock, 4>(counter_end, num_repeats, num_skip);
-    PrintTimePerfTest<spin_lock, 5>(counter_end, num_repeats, num_skip);
-    PrintTimePerfTest<spin_lock, 6>(counter_end, num_repeats, num_skip);
-    PrintTimePerfTest<spin_lock, 7>(counter_end, num_repeats, num_skip);
-    PrintTimePerfTest<spin_lock, 8>(counter_end, num_repeats, num_skip);
+    // PrintTimePerfTest<spin_lock, 5>(counter_end, num_repeats, num_skip);
+    // PrintTimePerfTest<spin_lock, 6>(counter_end, num_repeats, num_skip);
+    // PrintTimePerfTest<spin_lock, 7>(counter_end, num_repeats, num_skip);
+    // PrintTimePerfTest<spin_lock, 8>(counter_end, num_repeats, num_skip);
     // PrintTimePerfTest<spin_lock, 9>(counter_end, num_repeats, num_skip);
     // PrintTimePerfTest<spin_lock, 10>(counter_end, num_repeats, num_skip);
     // PrintTimePerfTest<spin_lock, 11>(counter_end, num_repeats, num_skip);

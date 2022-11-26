@@ -1,13 +1,13 @@
 #https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html
 
-CC  = g++
-CXX = g++
-LD  = g++
+CXX = clang++-14
+CC  = $(CXX)
+LD  = $(CXX)
 
 RM = rm -rf
 
 OPTIM_FLAGS = -O3
-OTHER_FLAGS = -MD -pthread
+OTHER_FLAGS = -MD -pthread -std=c++17
 
 FLAGS  = $(OPTIM_FLAGS) $(OTHER_FLAGS)
 

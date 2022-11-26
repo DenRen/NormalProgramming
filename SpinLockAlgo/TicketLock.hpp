@@ -26,3 +26,12 @@ public:
         m_current.store(next_index, std::memory_order_release);
     }
 };
+
+// -----------------------
+// Q: *
+
+// TODO:
+// 1) Stack (lock-free) or/and Queue (lock-free)
+// 2) Skip list (l-f) and Hash-Table Split orderid list (Herlich)
+// 3) C-P problems. TLA+ (Sempha -> Cond var) and check correction
+// 4) Shared systems (FLP Theorem)

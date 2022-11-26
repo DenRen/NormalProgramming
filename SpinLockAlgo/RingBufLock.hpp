@@ -5,12 +5,22 @@
 
 #include "atomic_lib.hpp"
 
+#ifdef __cpp_lib_hardware_interference_size
+    using std::hardware_constructive_interference_size;
+#else
+    // 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
+    constexpr std::size_t hardware_constructive_interference_size = 64;
+#endif
+
 template <std::size_t NumTh>
 class RingBufLock
 {
+    struct alignas(hardware_constructive_interference_size*0 + 1) // Optimization not work)))
+    CacheBool : public std::atomic<bool> {};
+
     constexpr static std::size_t N = NumTh + 1;
+    std::array<CacheBool, N> m_rb;
     std::atomic<std::size_t> m_i_tail{ N - 1 };
-    std::array<std::atomic<bool>, N> m_rb;
 
 public:
     RingBufLock()
