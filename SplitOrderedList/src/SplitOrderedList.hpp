@@ -152,11 +152,22 @@ public:
     }
 
     Iterator Insert(T value);
-    // void Erase(Node* pos);
+    Iterator Erase(T value);
 
 private:
     std::atomic<Node*> m_head{ nullptr };
 }; // class SortedList
+
+template <typename T>
+SortedList<T>::~SortedList()
+{
+    for(Node* cur = m_head.load(); cur != nullptr; )
+    {
+        Node* save_next = cur->m_next;
+        delete cur;
+        cur = save_next;
+    }
+}
 
 template <typename T>
 typename SortedList<T>::Iterator SortedList<T>::Insert(T value)
@@ -165,7 +176,8 @@ typename SortedList<T>::Iterator SortedList<T>::Insert(T value)
 
     bool changed = false;
     do {
-        if (m_head.load() == nullptr)
+        Node* head = m_head.load();
+        if (head == nullptr)
         {
             Node* expected = nullptr;
             changed = m_head.compare_exchange_strong(expected, new_node);
@@ -173,7 +185,7 @@ typename SortedList<T>::Iterator SortedList<T>::Insert(T value)
         else
         {
             // Find position
-            auto it = begin(), end_it = end();
+            auto it = Iterator{head}, end_it = end();
             auto prev_it = it;
             do
             {
@@ -197,14 +209,52 @@ typename SortedList<T>::Iterator SortedList<T>::Insert(T value)
 }
 
 template <typename T>
-SortedList<T>::~SortedList()
+void MarkPointer(std::atomic<T*>& ptr) noexcept
 {
-    for(Node* cur = m_head.load(); cur != nullptr; )
-    {
-        Node* save_next = cur->m_next;
-        delete cur;
-        cur = save_next;
-    }
+    ptr.compare_exchange_strong();
+}
+
+template <typename T>
+typename SortedList<T>::Iterator SortedList<T>::Erase(T value)
+{
+    Node* prev = nullptr;
+    Node* cur = nullptr;
+    Node* next = nullptr;
+
+    bool erased = false;
+    do {
+        Node* head = m_head.load();
+        if (head == nullptr)
+            return nullptr;
+        
+        prev = cur = head;
+        do {
+            if (cur->m_val != value)
+            {
+                prev = cur;
+                cur = cur->m_next.load();
+            }
+            else
+            {
+                break;
+            }
+        } while(cur != nullptr);
+
+        if (cur == nullptr)
+            return nullptr;
+
+        // Node* expected = next;
+        // if (!cur->m_next.compare_exchange_strong(expected, (Node*)((unsigned long long) next | 1ull)))
+        // {
+        //     continue;
+        // }
+
+        auto* expected = cur;
+        erased = prev->m_next.compare_exchange_strong(expected, cur->m_next);
+    } while (!erased);
+    delete cur;
+
+    return next;
 }
 
 } // namespace lf

@@ -31,9 +31,25 @@ int main()
                 {
                     list.Insert(10 * i);
                 }
+
+                for (int i = num_repeats - 100; i < num_repeats; ++i)
+                {
+                    list.Erase(10 * i);
+                }
             #endif
         });
     }
+
+    for (auto& th : threads)
+        th.join();
+
+    for (auto& th : threads)
+        th = std::thread{[&list, num_repeats](){
+            for (int i = num_repeats - 100; i < num_repeats; ++i)
+            {
+                list.Erase(10 * i);
+            }
+        }};
 
     for (auto& th : threads)
         th.join();
@@ -45,7 +61,7 @@ int main()
         // std::cout << val << std::endl;
         sum += val;
     }
-    const long ref_sum = 10l * num_repeats * (num_repeats - 1) / 2;
+    const long ref_sum = 10l * (num_repeats - 100) * ((num_repeats - 100) - 1) / 2;
 
     std::cout << "Result: ";
     if (sum == ref_sum && std::is_sorted(list.begin(), list.end()))
