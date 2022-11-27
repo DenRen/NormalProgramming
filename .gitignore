@@ -32,3 +32,5 @@
 *.app
 matrix/.vscode
 matrix/build*
+SplitOrderedList/build
+SplitOrderedList/.vscode
