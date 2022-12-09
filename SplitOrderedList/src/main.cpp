@@ -4,10 +4,17 @@
 
 #include "SplitOrderedList.hpp"
 
-int main()
+int main(int argc, char* argv[])
 {
-    const int num_threads = 4;
+    int num_threads = argc == 2 ? atoi(argv[1]) : -1;
+    if (num_threads <= 0)
+    {
+        std::cerr << "Inter the number of threads, please" << std::endl;
+        return 0;
+    }
+
     const int num_repeats = 30'000;
+    const int num_erase = 13'000;
 
     lf::SortedList<int> list;
 
@@ -15,70 +22,48 @@ int main()
     for (int i_th = 0; i_th < num_threads; ++i_th)
     {
         threads.emplace_back([&list, num_repeats](){
-            #if 0
-                list.PushFront(0);
-                for (int i = 1; i < num_repeats; ++i)
-                {
-                #if 1
-                    auto it = list.begin();
-                    list.InsertAfter(it, 10 * i);
-                #else
-                    list.PushFront(10 * i);
-                #endif
-                }
-            #else
-                for (int i = 0; i < num_repeats; ++i)
-                {
-                    list.Insert(10 * i);
-                }
-
-                for (int i = num_repeats - 100; i < num_repeats; ++i)
-                {
-                    list.Erase(10 * i);
-                }
-            #endif
+            for (int i = 0; i < num_repeats; ++i)
+            {
+                list.Insert(10 * i);
+            }
         });
     }
 
     for (auto& th : threads)
         th.join();
 
+    for (int i = 0; i < num_repeats; ++i)
+    {
+        if (list.Find(10 * i) == nullptr)
+        {
+            std::cout << "Test Insert\tfailed!\n";
+            return 0;
+        }
+    }
+    std::cout << "Test Insert\tpassed!\n";
+
     for (auto& th : threads)
+    {
         th = std::thread{[&list, num_repeats](){
-            for (int i = num_repeats - 100; i < num_repeats; ++i)
+            for (int i = 0; i < num_erase; ++i)
             {
                 list.Erase(10 * i);
             }
         }};
+    }
 
     for (auto& th : threads)
         th.join();
 
-#if 1
-    long sum = 0;
-    for (auto val : list)
+    for (int i = 0; i < num_repeats; ++i)
     {
-        // std::cout << val << std::endl;
-        sum += val;
+        auto* res = list.Find(10 * i);
+        if ((i <  num_erase && res != nullptr) ||
+            (i >= num_erase && res == nullptr))
+        {
+            std::cout << "Test Erase\tfailed!\n";
+            return 0;
+        }
     }
-    const long ref_sum = 10l * (num_repeats - 100) * ((num_repeats - 100) - 1) / 2;
-
-    std::cout << "Result: ";
-    if (sum == ref_sum && std::is_sorted(list.begin(), list.end()))
-    {
-        std::cout << "Good!\n";
-    }
-    else
-    {
-        std::cout << sum << " != Ref: " << ref_sum << '\n';
-        std::cout << "Fail!\n";
-    }
-#endif
-
-#if 0
-    std::ios_base::sync_with_stdio(false);
-    for (auto val : list)
-        std::cout << val << '\n';
-    std::cout.flush();
-#endif
+    std::cout << "Test Erase\tpassed!\n";
 }

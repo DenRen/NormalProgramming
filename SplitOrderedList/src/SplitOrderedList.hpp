@@ -7,254 +7,191 @@
 namespace lf
 {
 
-struct NodeBase
-{
-    std::atomic <NodeBase*> m_next;
-
-    NodeBase(NodeBase* next)
-        : m_next{next}
-    {}
-};
-
 template <typename T>
-class ForwardList
+T* MarkPointer(T* ptr) noexcept
 {
-public:
-    struct Node : public NodeBase
-    {
-        T m_val;
-
-        Node(T val, NodeBase* next)
-            : NodeBase{next}
-            , m_val{std::move(val)}
-        {}
-
-        Node& Next() noexcept { return static_cast<Node&>(*this->m_next); };
-        Node& Prev() noexcept { return static_cast<Node&>(*this->m_prev); };
-    };
-
-    ~ForwardList();
-
-    class Iterator
-    {
-        NodeBase* m_node;
-
-    public:
-        Iterator(NodeBase* node)
-            : m_node{node}
-        {}
-
-        T& operator*() { return static_cast<Node*>(m_node)->m_val; }
-        T* operator->() noexcept { return &static_cast<Node*>(m_node)->m_val; }
-        Iterator& operator++() { m_node = m_node->m_next; return *this; }
-        Iterator operator++(int) { auto node = m_node; m_node = m_node->m_next; return node; }
-        bool operator==(const Iterator& rhs) noexcept { return m_node == rhs.m_node; }
-        bool operator!=(const Iterator& rhs) noexcept { return m_node != rhs.m_node; }
-
-        NodeBase* base() const noexcept { return m_node; };
-    };
-
-    Iterator begin() noexcept
-    {
-        return m_head.m_next.load();
-    }
-    Iterator end() noexcept
-    {
-        return nullptr;
-    }
-
-    Iterator PushFront(T value)
-    {
-        return InsertBefore(std::move(value), m_head.m_next);
-    }
-
-    Iterator InsertAfter(Iterator pos, T value)
-    {
-        NodeBase* left = pos.base();
-        return InsertBefore(std::move(value), left->m_next);
-    }
-    // void Erase(Node* pos);
-
-private:
-    Iterator InsertBefore(T value, std::atomic<NodeBase*>& next);
-
-    NodeBase m_head{ nullptr };
-};
-
-template <typename T>
-typename ForwardList<T>::Iterator ForwardList<T>::InsertBefore(T value, std::atomic<NodeBase*>& next)
-{
-    NodeBase* new_node = new Node{ std::move(value), nullptr };
-    NodeBase* cur_next = nullptr;
-    do {
-        cur_next = next.load();
-        new_node->m_next = cur_next;
-    } while(!next.compare_exchange_strong(cur_next, new_node));
-    return new_node;
+    return reinterpret_cast<T*>(
+               reinterpret_cast<unsigned long long>(ptr) | 1ull
+           );
 }
 
 template <typename T>
-ForwardList<T>::~ForwardList()
+T* UnmarkPointer(T* ptr) noexcept
 {
-    for(NodeBase* cur = m_head.m_next; cur != nullptr; )
-    {
-        NodeBase* save_next = cur->m_next;
-        delete static_cast<Node*>(cur);
-        cur = save_next;
-    }
+    return reinterpret_cast<T*>(
+               reinterpret_cast<unsigned long long>(ptr) & ~1ull
+           );
 }
+
+template <typename T>
+bool IsMarkedPointer(T* ptr) noexcept
+{
+    return !!reinterpret_cast<T*>(
+               reinterpret_cast<unsigned long long>(ptr) & 1ull
+           );
+}
+
 
 template <typename T>
 class SortedList
 {
-public:
-    struct Node
+    class Node
     {
-        std::atomic<Node*> m_next;
-        T m_val;
-
-        Node(T val, Node* next)
-            : m_next{next}
-            , m_val{std::move(val)}
+    public:
+        Node(Node* next, T value)
+            : m_next{ next }
+            , m_value{ value }
         {}
 
-        Node& Next() noexcept { *this->m_next.load(); };
+        std::atomic<Node*> m_next;
+        T m_value;
     };
 
+public:
     ~SortedList();
 
-    class Iterator
-    {
-        Node* m_node;
-
-    public:
-        Iterator(Node* node)
-            : m_node{node}
-        {}
-
-        T& operator*() { return m_node->m_val; }
-        T* operator->() noexcept { return &m_node->m_val; }
-        Iterator& operator++() { m_node = m_node->m_next; return *this; }
-        Iterator operator++(int) { auto node = m_node; m_node = m_node->m_next; return node; }
-        bool operator==(const Iterator& rhs) noexcept { return m_node == rhs.m_node; }
-        bool operator!=(const Iterator& rhs) noexcept { return m_node != rhs.m_node; }
-
-        Node* base() const noexcept { return m_node; };
-    };
-
-    Iterator begin() noexcept
-    {
-        return m_head.load();
-    }
-    Iterator end() noexcept
-    {
-        return nullptr;
-    }
-
-    Iterator Insert(T value);
-    Iterator Erase(T value);
+    Node* Insert(T value);
+    Node* Erase(T value);
+    Node* Find(T value) const;
 
 private:
     std::atomic<Node*> m_head{ nullptr };
-}; // class SortedList
+};
 
 template <typename T>
 SortedList<T>::~SortedList()
 {
-    for(Node* cur = m_head.load(); cur != nullptr; )
+    Node* curr = m_head;
+    while(curr != nullptr)
     {
-        Node* save_next = cur->m_next;
-        delete cur;
-        cur = save_next;
+        Node* next = curr->m_next.load();   // todo
+        delete curr;
+        curr = next;
     }
 }
 
 template <typename T>
-typename SortedList<T>::Iterator SortedList<T>::Insert(T value)
+typename SortedList<T>::Node* SortedList<T>::Insert(T value)
 {
-    Node* new_node = new Node{ std::move(value), nullptr };
+    Node* new_node = new Node{nullptr, value};
 
-    bool changed = false;
-    do {
+    while (true)
+    {
         Node* head = m_head.load();
         if (head == nullptr)
         {
             Node* expected = nullptr;
-            changed = m_head.compare_exchange_strong(expected, new_node);
+            if (m_head.compare_exchange_strong(expected, new_node))
+                break;
+            else
+                continue;
         }
-        else
+
+        if (head->m_value == value)
+            return head;
+
+        Node* prev = head;
+        Node* curr = UnmarkPointer(head->m_next.load());
+        while (curr != nullptr)
         {
-            // Find position
-            auto it = Iterator{head}, end_it = end();
-            auto prev_it = it;
-            do
+            if (curr->m_value == value)
             {
-                while(it != end_it && *it < new_node->m_val)
-                    prev_it = it++;
+                delete new_node;
+                return curr;
+            }
 
-                if (it != nullptr && *it == new_node->m_val)
-                {
-                    delete new_node;
-                    return it;
-                }
-            } while (it != end_it);
-
-            auto* cur_next = it.base();
-            new_node->m_next = cur_next;
-            changed = prev_it.base()->m_next.compare_exchange_strong(cur_next, new_node);
+            prev = curr;
+            curr = UnmarkPointer(curr->m_next.load());
         }
-    } while(!changed);
+
+        new_node->m_next.store(curr);
+        if (prev->m_next.compare_exchange_strong(curr, new_node))
+            break;
+    }
 
     return new_node;
 }
 
 template <typename T>
-void MarkPointer(std::atomic<T*>& ptr) noexcept
+typename SortedList<T>::Node* SortedList<T>::Find(T value) const
 {
-    ptr.compare_exchange_strong();
+    Node* head = m_head.load();
+    if (head == nullptr)
+        return nullptr;
+
+    Node* curr = head;
+    while (curr != nullptr)
+    {
+        if (curr->m_value == value)
+            return curr;
+        curr = UnmarkPointer(curr->m_next.load());
+    }
+
+    return nullptr;
 }
 
 template <typename T>
-typename SortedList<T>::Iterator SortedList<T>::Erase(T value)
+typename SortedList<T>::Node* SortedList<T>::Erase(T value)
 {
-    Node* prev = nullptr;
-    Node* cur = nullptr;
-    Node* next = nullptr;
-
-    bool erased = false;
-    do {
+    while (1)
+    {
         Node* head = m_head.load();
         if (head == nullptr)
             return nullptr;
-        
-        prev = cur = head;
-        do {
-            if (cur->m_val != value)
-            {
-                prev = cur;
-                cur = cur->m_next.load();
-            }
-            else
-            {
-                break;
-            }
-        } while(cur != nullptr);
 
-        if (cur == nullptr)
+        if (head->m_value == value)
+        {
+            Node* next = UnmarkPointer(head->m_next.load());
+            Node* next_marked = MarkPointer(next);
+            if (!head->m_next.compare_exchange_strong(next, next_marked))
+                continue;
+
+            if (!m_head.compare_exchange_strong(head, next))
+            {
+                head->m_next.store(next);
+                continue;
+            }
+
+            // delete head;    // Change to HazardPtr or RCU
+
+            return next;
+        }
+
+        Node* prev = head;
+        Node* curr = UnmarkPointer(head->m_next.load());
+        while (curr != nullptr)
+        {
+            if (curr->m_value == value)
+                break;
+
+            prev = curr;
+            curr = UnmarkPointer(curr->m_next.load());
+        }
+
+        if (curr == nullptr)
             return nullptr;
 
-        // Node* expected = next;
-        // if (!cur->m_next.compare_exchange_strong(expected, (Node*)((unsigned long long) next | 1ull)))
-        // {
-        //     continue;
-        // }
+        Node* next = nullptr;
+        while (true)
+        {
+            next = UnmarkPointer(curr->m_next.load());
+            Node* next_marked = MarkPointer(next);
+            if (curr->m_next.compare_exchange_strong(next, next_marked))
+                break;
+        }
+        
+        if (!prev->m_next.compare_exchange_strong(curr, next))
+        {
+            curr->m_next.store(next);
+            continue;
+        }
 
-        auto* expected = cur;
-        erased = prev->m_next.compare_exchange_strong(expected, cur->m_next);
-    } while (!erased);
-    delete cur;
+        // delete curr;    // See above
 
-    return next;
+        return next;
+    }
+
+    return nullptr;
 }
 
 } // namespace lf
