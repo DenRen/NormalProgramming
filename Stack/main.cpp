@@ -4,15 +4,18 @@
 #include <array>
 #include <functional>
 #include <iostream>
+#include <deque>
 
-struct HazardPointer
+constexpr std::size_t g_num_hazard_pointers_per_thread = 5;
+constexpr std::size_t g_num_threads_max = 16;
+
+struct LocalHazardPointers
 {
     std::atomic<std::thread::id> m_id;
-    std::atomic<void*> m_pointer;
+    std::array<std::atomic<void*>, g_num_hazard_pointers_per_thread> m_pointers;
 };
 
-constexpr std::size_t s_num_hazard_pointers = 20;
-std::array<HazardPointer, s_num_hazard_pointers> s_hp_storage;
+std::array<LocalHazardPointers, g_num_threads_max> g_hp_storage;
 
 class HazardPointerOwner
 {
@@ -20,7 +23,7 @@ public:
     HazardPointerOwner()
     {
         const auto self_thread_id = std::this_thread::get_id();
-        for (auto& hp : s_hp_storage)
+        for (auto& hp : g_hp_storage)
         {
             std::thread::id expected;
             if (hp.m_id.compare_exchange_strong(expected, self_thread_id))
@@ -33,19 +36,25 @@ public:
         throw std::runtime_error("Hazard pointers arrays is overflowed!");
     }
 
-    std::atomic<void*>& get() const noexcept
+    std::atomic<void*>& get() const
     {
-        return m_hp->m_pointer;
+        for (auto& ptr : m_hp->m_pointers)
+            if (ptr.load() == nullptr)
+                return ptr;
+
+        throw std::runtime_error("Local hazard pointers are over!");
     }
 
     ~HazardPointerOwner()
     {
-        m_hp->m_pointer.store(nullptr);
+        for (auto& ptr : m_hp->m_pointers)
+            ptr.store(nullptr);
+
         m_hp->m_id.store(std::thread::id{});
     }
 
 private:
-    HazardPointer* m_hp = nullptr;
+    LocalHazardPointers* m_hp = nullptr;
 };
 
 std::atomic<void*>& GetHazardPointer()
@@ -56,9 +65,10 @@ std::atomic<void*>& GetHazardPointer()
 
 bool is_hp_used_other_threads(void* finded_ptr)
 {
-    for(const auto&[thread_id, ptr] : s_hp_storage)
-        if (ptr.load() == finded_ptr)
-            return true;
+    for(const auto&[thread_id, ptrs] : g_hp_storage)
+        for (auto& ptr : ptrs)
+            if (ptr.load() == finded_ptr)
+                return true;
 
     return false;
 }
@@ -187,20 +197,20 @@ public:
 
 int main()
 {
-    std::size_t num_trheads = -1;
-    std::cin >> num_trheads;
+    std::size_t num_threads = -1;
+    std::cin >> num_threads;
 
     LockFreeStack<int> stack;
 
     std::vector<std::thread> threads;
-    for (std::size_t i = 0; i < num_trheads; ++i)
+    for (std::size_t i = 0; i < num_threads; ++i)
     {
         threads.emplace_back([&stack, i]() {
             for (int j = 0; j < 5000; ++j)
             {
-                stack.Push(10 * j + i);
+                stack.Push(10 * j);
                 std::this_thread::yield();
-                stack.Push(10 * j + i);
+                stack.Push(10 * j);
             }
         });
     }
@@ -208,9 +218,23 @@ int main()
     for (auto& th : threads)
         th.join();
 
-    for(auto val = stack.Pop(); val.get() != nullptr; val = stack.Pop())
+    std::vector<long> accs(num_threads);
+    for (std::size_t i = 0; i < num_threads; ++i)
     {
-        // std::cout << *val << "\n";
+        threads[i] = std::thread{[&stack, &acc = accs[i]]() {
+            for(auto val = stack.Pop(); val.get() != nullptr; val = stack.Pop())
+            {
+                acc += *val;
+            }
+        }};
     }
-    std::cout << std::endl;
+
+    for (auto& th : threads)
+        th.join();
+
+    std::size_t acc = 0;
+    for (auto val : accs)
+        acc += val;
+
+    std::cout << (acc == num_threads * (0 + 4999) * 5000 * 10) << std::endl;
 }
