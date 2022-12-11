@@ -32,10 +32,64 @@ struct HPStorageList
     ~HPStorageList()
     {
         EXECUTE(std::cerr << "dtor HPStorageList\n");
+        ReleaseOwnerless();
     }
 
     unsigned GetMaxNumThreads() const noexcept { return m_thread_id.size(); }
+
+    template <typename Iter>
+    void AddOwnerlessPointers(Iter begin, Iter end);
+
+private:
+    void ReleaseOwnerless();
+
+    // Linked-list of objects, that connot be removed in HPLocalManagerList destructor
+    struct Node
+    {
+        Node* m_next = nullptr;
+        T* m_data;
+
+        Node(T* data) :
+            m_data{ data }
+        {}
+    };
+
+    std::atomic<Node*> m_ownersless;
 };
+
+template <typename T>
+template <typename Iter>
+void HPStorageList<T>::AddOwnerlessPointers(Iter begin, Iter end)
+{
+    if (begin == end)
+        return;
+
+    Node* head = new Node{*begin++};
+    
+    Node* curr = head;
+    while(begin != end)
+    {
+        curr = curr->m_next = new Node{*begin++};
+    }
+    Node* tail = curr;
+
+    tail->m_next = m_ownersless.load();
+
+    while(!m_ownersless.compare_exchange_strong(tail->m_next, head));
+}
+
+template <typename T>
+void HPStorageList<T>::ReleaseOwnerless()
+{
+    Node* curr = m_ownersless.load();
+    while (curr != nullptr)
+    {
+        Node* next = curr->m_next;
+        delete curr->m_data;
+        delete curr;
+        curr = next;
+    }
+}
 
 template <typename T>
 class HPLocalManagerList
@@ -76,7 +130,7 @@ class HPLocalManagerList
         return s_batch_coef * s_hp_per_thread * num_threads;
     }
 
-    void ReleaseRetired(unsigned size_retired_ptrs)
+    void ReleaseRetired()
     {
         EXECUTE(std::cout << "ReleaseRetired\n");
         // Store all hazard pointers of other threads
@@ -94,7 +148,7 @@ class HPLocalManagerList
 
         // Release all unprotected pointers
         auto it_write = m_retired_ptrs.begin();
-        auto it_end = std::next(it_write, size_retired_ptrs);
+        auto it_end = std::next(it_write, m_num_retired_ptrs);
         for (auto it_read = m_retired_ptrs.cbegin(); it_read != it_end; ++it_read)
         {
             if (std::binary_search(protected_ptrs.cbegin(), protected_ptrs.cend(), *it_read))
@@ -102,6 +156,8 @@ class HPLocalManagerList
             else
                 delete *it_read;
         }
+
+        m_num_retired_ptrs = std::distance(m_retired_ptrs.begin(), it_write);
     }
 
 public:
@@ -119,7 +175,11 @@ public:
         for (auto& hp : m_hps)
             hp.store(nullptr);
 
-        ReleaseRetired(m_num_retired_ptrs);
+        ReleaseRetired();
+
+        auto it_retired_begin = m_retired_ptrs.begin();
+        auto it_retired_end = std::next(it_retired_begin, m_num_retired_ptrs);
+        m_hp_storage.AddOwnerlessPointers(it_retired_begin, it_retired_end);
 
         const std::thread::id local_id = std::this_thread::get_id();
         for (auto& id : m_hp_storage.m_thread_id)
@@ -162,10 +222,7 @@ public:
         m_retired_ptrs[m_num_retired_ptrs] = ptr;
 
         if (++m_num_retired_ptrs == m_retired_ptrs.size())
-        {
-            ReleaseRetired(m_num_retired_ptrs);
-            m_num_retired_ptrs = 0;
-        }
+            ReleaseRetired();
     }
 };
 
@@ -354,6 +411,4 @@ public:
             std::cout << node->m_value << std::endl;
         }
     }
-
-
 };
