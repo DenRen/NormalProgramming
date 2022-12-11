@@ -96,7 +96,7 @@ class HPLocalManagerList
 {
     HPStorageList<T>& m_hp_storage;
 
-    using HPs = HPStorageList<T>::HPs;
+    using HPs = typename HPStorageList<T>::HPs;
     constexpr static inline unsigned s_hp_per_thread = HPStorageList<T>::s_hp_per_thread;
 
     HPs& m_hps;

@@ -3,6 +3,8 @@
 #include <iterator>
 #include <thread>
 #include <atomic>
+#include <array>
+#include <assert.h>
 
 #include "MarkedPointers.hpp"
 
@@ -89,7 +91,7 @@ class HPLocalManagerUniqList
 {
     HPStorageUniqList<T>& m_hp_storage;
 
-    using HPs = HPStorageUniqList<T>::HPs;
+    using HPs = typename HPStorageUniqList<T>::HPs;
     constexpr static inline unsigned s_hp_per_thread = HPStorageUniqList<T>::s_hp_per_thread;
 
     HPs& m_hps;
@@ -263,7 +265,7 @@ public:
         }
     }
 
-    void Insert(const T& value)
+    Node* Insert(const T& value)
     {
         HPManager& hp_mgr = GetHPManager();
         auto& hps = hp_mgr.GetHPs();
@@ -288,6 +290,7 @@ public:
             if (curr != nullptr && !(value < curr->m_value))
             {
                 delete new_node;
+                new_node = nullptr;
                 break;
             }
 
@@ -299,6 +302,8 @@ public:
         }
 
         hp_mgr.ResetHPs();
+
+        return new_node;    // Only for sential nodes, they cannot be removed
     }
 
     bool Find(const T& value)
@@ -404,5 +409,198 @@ public:
         }
     }
 };
+
+template <typename T>
+class SplitOrderedList
+{
+    // Hash-table
+    constexpr static inline unsigned s_log_size_table = 8;
+    constexpr static inline unsigned s_size_table = 1u << s_log_size_table;
+    using hash_t = uint32_t;
+
+    static hash_t ReverseBitOrder(hash_t x) noexcept
+    {
+        // swap odd and even bits
+        x = ((x >> 1) & 0x55555555) | ((x & 0x55555555) << 1);
+        // swap consecutive pairs
+        x = ((x >> 2) & 0x33333333) | ((x & 0x33333333) << 2);
+        // swap nibbles ...
+        x = ((x >> 4) & 0x0F0F0F0F) | ((x & 0x0F0F0F0F) << 4);
+        // swap bytes
+        x = ((x >> 8) & 0x00FF00FF) | ((x & 0x00FF00FF) << 8);
+        // swap 2-byte long pairs
+        return ( x >> 16 ) | ( x << 16 );
+    }
+
+    struct NodeBase
+    {
+        hash_t m_shah;
+        std::atomic<NodeBase*> m_next;
+
+        NodeBase(hash_t shah, NodeBase* next = nullptr)
+            : m_shah{shah}
+            , m_next{next}
+        {}
+
+        bool operator<(const NodeBase& rhs) const noexcept { return m_shah < rhs.m_shah; }
+        bool IsReg() const noexcept { return m_shah & 1u; }
+
+        ~NodeBase();
+    };
+
+    struct NodeSential : public NodeBase
+    {};
+
+    struct NodeReg : public NodeBase
+    {
+        T m_value;
+
+        NodeReg(const T& value, NodeBase* next = nullptr)
+            : NodeBase{ReverseBitOrder(std::hash<T>{}(value)) | 1u, next}
+            , m_value{value}
+        {}
+
+        bool operator==(const NodeReg& rhs) const noexcept { return m_value == rhs.m_value; }
+    };
+
+    HPStorageUniqList<NodeBase> m_hp_storage;
+    using HPManager = HPLocalManagerUniqList<NodeBase>;
+    HPManager& GetHPManager()
+    {
+        thread_local static HPLocalManagerUniqList<NodeBase> hp_mgr{ m_hp_storage };
+        return hp_mgr;
+    }
+
+    using Table = std::array<std::atomic<NodeSential*>, s_size_table>;
+
+    std::atomic <unsigned> m_num_elems, m_num_buckets;
+    Table m_table;
+
+    void InsertSential(hash_t shah)
+    {
+
+    }
+
+    NodeReg* ToReg(NodeBase* base) { return static_cast<NodeReg*>(base); }
+
+    void InsertReg(NodeSential* node_sent, const T& value)
+    {
+        // Эта функция не реаллоцирует размер
+
+        HPManager& hp_mgr = GetHPManager();
+        auto& hps = hp_mgr.GetHPs();
+
+        NodeReg* new_node = new NodeReg{value};
+        hash_t shah = new_node->m_shah;
+
+        auto& head_line = node_sent->m_next;
+        while (true)
+        {
+            // Set head to hazard pointer
+            NodeBase* head = HPManager::Protect(head_line, hps[0]);
+            NodeBase* prev = nullptr;   // Protected by hps[0]
+            NodeBase* curr = head;      // Protected by hps[1]
+            while (curr != nullptr && curr->m_shah < shah)
+            {
+                // Go to next
+                hps[0].store(curr);
+                prev = curr;
+
+                curr = HPManager::Protect(curr->m_next, hps[1]);
+            }
+
+            if (curr != nullptr && value == ToReg(curr)->m_value)
+            {
+                delete new_node;
+                new_node = nullptr;
+                break;
+            }
+
+            new_node->m_next = curr;
+            auto& node = prev == nullptr ? head_line : prev->m_next;
+            NodeBase* expected = curr;
+            if (node.compare_exchange_strong(expected, new_node))
+                break;
+        }
+
+        hp_mgr.ResetHPs();
+    }
+
+public:
+    SplitOrderedList(unsigned max_num_threads)
+        : m_hp_storage{max_num_threads}
+    {
+        (void) max_num_threads;
+
+        for (auto& sent_ptr : m_table)
+            sent_ptr.store(nullptr);
+
+        NodeSential* init_reg_node = new NodeSential{0};
+        m_table[0].store(init_reg_node);
+
+        m_num_buckets.store(1);
+        m_num_elems.store(0);
+    }
+
+    ~SplitOrderedList()
+    {
+        NodeBase* curr = m_table[0].load();
+        while(curr != nullptr)
+        {
+            NodeBase* next = curr->m_next;
+
+            if (curr->IsReg())
+                delete ToReg(curr);
+            else
+                delete static_cast<NodeSential*>(curr);
+
+            curr = next;
+        }
+    }
+
+    void Insert(const T& value)
+    {
+        // Single thread env
+        hash_t hash = std::hash<T>{}(value);
+        hash_t shah = ReverseBitOrder(hash);
+
+        auto table_index = hash & (m_num_buckets.load() - 1);
+        NodeSential* node_sent = m_table[table_index].load();
+        if (node_sent == nullptr)
+        {
+            InsertSential(shah);
+            node_sent = m_table[table_index].load();
+            assert(node_sent != nullptr);
+        }
+
+        InsertReg(node_sent, value);
+    }
+
+    bool Find(const T& value);
+    void Erase(const T& value);
+
+    void Dump() const
+    {
+        NodeBase* curr = m_table[0].load();
+        while(curr != nullptr)
+        {
+            if (curr->IsReg())
+                std::cout << "Reg: " << ToReg(curr)->m_data << std::endl;
+            else
+                std::cout << "Sen: " << std::endl;
+
+            curr = curr->m_next;
+        }
+    }
+};
+
+template <typename T>
+SplitOrderedList<T>::NodeBase::~NodeBase()
+{
+    if (IsReg())
+    {
+        static_cast<NodeReg*>(this)->m_value.~T();
+    }
+}
 
 } // namespace lf

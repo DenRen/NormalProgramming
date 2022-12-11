@@ -161,7 +161,26 @@ void TestUniqListNative()
 
 int main(int argc, char* argv[])
 {
-    TestUniqListNative();
+    lf::SplitOrderedList<int> sol{16};
+
+    std::thread {
+        [&sol]() {
+            sol.Insert(1);
+
+            // list.Insert(1);
+            // list.Insert(1);
+            // list.Insert(2);
+            // list.Insert(7);
+            // list.Insert(-1);
+
+            // list.Dump();
+            // std::cout << std::endl;
+        }
+    }.join();
+    
+
+
+
     return 0;
 
     int num_threads = argc == 2 ? atoi(argv[1]) : -1;
