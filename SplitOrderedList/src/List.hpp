@@ -206,11 +206,11 @@ public:
     static T* Protect(std::atomic<T*>& ptr, std::atomic<T*>& hptr)
     {
         T* tmp = nullptr;
-        T* save_ptr = UnmarkPointer(ptr.load());
+        T* save_ptr = UnmarkPointer(ptr.load(std::memory_order::relaxed));
         do {
             tmp = save_ptr;
             hptr.store(save_ptr);
-            save_ptr = UnmarkPointer(ptr.load());
+            save_ptr = UnmarkPointer(ptr.load(std::memory_order::acquire));
         } while(save_ptr != tmp);
 
         return save_ptr;
