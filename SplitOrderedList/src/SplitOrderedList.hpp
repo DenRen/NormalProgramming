@@ -5,6 +5,7 @@
 #include <atomic>
 #include <array>
 #include <assert.h>
+#include <bit>
 
 #include "MarkedPointers.hpp"
 
@@ -476,22 +477,15 @@ class SplitOrderedList
     std::atomic <unsigned> m_num_elems, m_num_buckets;
     Table m_table;
 
-    void InsertSential(hash_t shah)
+    static NodeReg* ToReg(NodeBase* base) noexcept { return static_cast<NodeReg*>(base); }
+
+    NodeSential* InsertSential(NodeSential* node_sent, hash_t shah)
     {
-
-    }
-
-    NodeReg* ToReg(NodeBase* base) { return static_cast<NodeReg*>(base); }
-
-    void InsertReg(NodeSential* node_sent, const T& value)
-    {
-        // Эта функция не реаллоцирует размер
-
         HPManager& hp_mgr = GetHPManager();
         auto& hps = hp_mgr.GetHPs();
 
-        NodeReg* new_node = new NodeReg{value};
-        hash_t shah = new_node->m_shah;
+        NodeSential* new_node = new NodeSential{shah};
+        new_node->m_shah = shah;
 
         auto& head_line = node_sent->m_next;
         while (true)
@@ -509,10 +503,10 @@ class SplitOrderedList
                 curr = HPManager::Protect(curr->m_next, hps[1]);
             }
 
-            if (curr != nullptr && value == ToReg(curr)->m_value)
+            if (curr != nullptr && curr->m_shah == shah)
             {
                 delete new_node;
-                new_node = nullptr;
+                new_node = static_cast<NodeSential*>(curr);
                 break;
             }
 
@@ -524,6 +518,90 @@ class SplitOrderedList
         }
 
         hp_mgr.ResetHPs();
+
+        return new_node;
+    }
+
+
+    void InsertReg(NodeSential* node_sent, const T& value)
+    {
+        // Эта функция не реаллоцирует размер
+
+        HPManager& hp_mgr = GetHPManager();
+        auto& hps = hp_mgr.GetHPs();
+
+        NodeReg* new_node = new NodeReg{value};
+        hash_t shah = new_node->m_shah | 1;
+
+        auto& head_line = node_sent->m_next;
+        while (true)
+        {
+            // Set head to hazard pointer
+            NodeBase* head = HPManager::Protect(head_line, hps[0]);
+            NodeBase* prev = nullptr;   // Protected by hps[0]
+            NodeBase* curr = head;      // Protected by hps[1]
+            while (curr != nullptr && curr->m_shah < shah)
+            {
+                // Go to next
+                hps[0].store(curr);
+                prev = curr;
+
+                curr = HPManager::Protect(curr->m_next, hps[1]);
+            }
+
+            if (curr != nullptr && curr->IsReg() && value == ToReg(curr)->m_value)
+            {
+                delete new_node;
+                break;
+            }
+
+            new_node->m_next = curr;
+            auto& node = prev == nullptr ? head_line : prev->m_next;
+            NodeBase* expected = curr;
+            if (node.compare_exchange_strong(expected, new_node))
+            {
+                m_num_elems.fetch_add(1);
+                break;
+            }
+        }
+
+        hp_mgr.ResetHPs();
+    }
+
+    static size_t ParentBucket(size_t nBucket) noexcept
+    {
+        assert( nBucket > 0 );
+        return nBucket & ~( 1 << std::countr_zero ( nBucket ) );
+    }
+
+    NodeSential* GetNodeSential(hash_t hash)
+    {
+        hash_t table_index = hash & (m_num_buckets.load() - 1);
+        NodeSential* node_sent = m_table[table_index].load();
+        if (node_sent == nullptr)
+        {
+            NodeSential* parent_sent = table_index ? GetNodeSential(ParentBucket(table_index))
+                                                   : m_table[0].load();
+            NodeSential* new_sent = InsertSential(parent_sent, ReverseBitOrder(table_index));
+            m_table[table_index].store(new_sent);
+            node_sent = new_sent;
+            assert(node_sent != nullptr);
+        }
+
+        return node_sent;
+    }
+
+    void CheckOnRehash()
+    {
+        auto num_elems = m_num_elems.load();
+        auto num_buckets = m_num_buckets.load();
+        if (num_elems >= 2 * num_buckets)
+        {
+            if (m_table.size() < 2 * num_buckets)
+                return;
+
+            m_num_buckets.compare_exchange_strong(num_buckets, 2 * num_buckets);
+        }
     }
 
 public:
@@ -538,7 +616,7 @@ public:
         NodeSential* init_reg_node = new NodeSential{0};
         m_table[0].store(init_reg_node);
 
-        m_num_buckets.store(1);
+        m_num_buckets.store(1+1);
         m_num_elems.store(0);
     }
 
@@ -560,36 +638,88 @@ public:
 
     void Insert(const T& value)
     {
-        // Single thread env
+        CheckOnRehash();
+
         hash_t hash = std::hash<T>{}(value);
         hash_t shah = ReverseBitOrder(hash);
-
-        auto table_index = hash & (m_num_buckets.load() - 1);
-        NodeSential* node_sent = m_table[table_index].load();
-        if (node_sent == nullptr)
-        {
-            InsertSential(shah);
-            node_sent = m_table[table_index].load();
-            assert(node_sent != nullptr);
-        }
+        NodeSential* node_sent = GetNodeSential(hash);
 
         InsertReg(node_sent, value);
     }
 
-    bool Find(const T& value);
+    bool Find(const T& value)
+    {
+        HPManager& hp_mgr = GetHPManager();
+        auto& hps = hp_mgr.GetHPs();
+
+        hash_t hash = std::hash<T>{}(value);
+        hash_t shah = ReverseBitOrder(hash);
+        NodeSential* node_sent = GetNodeSential(hash);
+
+        auto& head_line = node_sent->m_next;
+
+        NodeBase* head = HPManager::Protect(head_line, hps[0]);
+        NodeBase* prev = nullptr;   // Protected by hps[0]
+        NodeBase* curr = head;      // Protected by hps[1]
+        while (curr != nullptr && curr->m_shah < shah)
+        {
+            // Go to next
+            hps[0].store(curr);
+            prev = curr;
+
+            curr = HPManager::Protect(curr->m_next, hps[1]);
+        }
+
+        bool res = false;
+        if (curr != nullptr && curr->m_shah == shah)
+            res = ToReg(curr)->m_value == value;
+
+        hp_mgr.ResetHPs();
+
+        return res;
+    }
+
     void Erase(const T& value);
 
     void Dump() const
     {
+        std::cout << "num buckets: " << m_num_buckets << std::endl;
+        std::cout << "num elems: " << m_num_elems << std::endl;
+
+        for (unsigned i = 0; i < m_num_buckets.load(); ++i)
+        if (m_table[i].load())
+            std::cout << '[' << i << ']' << std::hex << m_table[i].load()->m_shah << std::endl;
+        else
+            std::cout << '[' << i << ']' << "   ---   " << std::endl;
+
         NodeBase* curr = m_table[0].load();
         while(curr != nullptr)
         {
             if (curr->IsReg())
-                std::cout << "Reg: " << ToReg(curr)->m_data << std::endl;
+                std::cout << "Reg: " << std::hex << curr->m_shah << std::dec << ", value: "<< ToReg(curr)->m_value << std::endl;
             else
-                std::cout << "Sen: " << std::endl;
+                std::cout << "Sen: " << std::hex  << curr->m_shah << std::dec << std::endl;
 
             curr = curr->m_next;
+        }
+        {
+            NodeBase* prev = m_table[0].load();
+            if (prev == nullptr)
+                return;
+
+            NodeBase* curr = prev->m_next;
+            while (curr != nullptr)
+            {
+                if (curr->m_shah > prev->m_shah == false)
+                {
+                    std::cerr << "prev: " << std::hex << prev->m_shah << std::endl;
+                    std::cerr << "curr: " << std::hex << curr->m_shah << std::endl;
+                    throw std::runtime_error("Error shah ordering");
+                }
+
+                prev = curr;
+                curr = curr->m_next;
+            }
         }
     }
 };

@@ -165,16 +165,17 @@ int main(int argc, char* argv[])
 
     std::thread {
         [&sol]() {
-            sol.Insert(1);
+            for (int i = 0; i < 40; ++i)
+                sol.Insert(i);
 
-            // list.Insert(1);
-            // list.Insert(1);
-            // list.Insert(2);
-            // list.Insert(7);
-            // list.Insert(-1);
+            sol.Insert(7);
+            sol.Dump();
+            std::cout << std::endl;
 
-            // list.Dump();
-            // std::cout << std::endl;
+            sol.Insert(3);
+
+            sol.Dump();
+            std::cout << std::endl;
         }
     }.join();
     
