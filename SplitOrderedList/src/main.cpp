@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <barrier>
 
 #include "HazardPointer.hpp"
 #include "SplitOrderedList.hpp"
@@ -229,6 +230,45 @@ void TestMultiThredingSOL(int num_threads)
     }}.join();
 }
 
+int64_t PerfTestSOL(unsigned num_threads)
+{
+    const int num_insert = 50'000;
+    const int num_erase = num_insert / 20;
+
+    lf::SplitOrderedList<int> sol{(unsigned)num_threads};
+
+    auto time_begin = std::chrono::high_resolution_clock::now();
+
+    std::vector<std::thread> threads;
+    for (int i_th = 0; i_th < num_threads; ++i_th)
+    {
+        threads.emplace_back([&sol, num_insert, i_th, num_threads](){
+            int i_begin = i_th * num_insert / num_threads;
+            int i_end = (i_th + 1) * num_insert / num_threads;
+
+            for (int i = i_begin; i < i_end; ++i)
+                sol.Insert(10 * i);
+
+            for (int i_repeat = 0; i_repeat < 10; ++i_repeat)
+            {
+                for (int i = i_begin; i < i_end; ++i)
+                    sol.Find(10 * i);
+            }
+
+            for (int i = i_begin; i < i_end; ++i)
+                sol.Erase(10 * i);
+        });
+    }
+
+    for (auto& th : threads)
+        th.join();
+
+    auto time_end = std::chrono::high_resolution_clock::now();
+    auto dtime = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_begin).count();
+
+    return dtime;
+}
+
 int main(int argc, char* argv[])
 {
     int num_threads = argc == 2 ? atoi(argv[1]) : -1;
@@ -238,7 +278,8 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    TestMultiThredingSOL(num_threads);
+    for (int i = 1; i <= num_threads; ++i)
+        std::cout << i << " " << PerfTestSOL(i) << std::endl;
 
     return 0;
 }

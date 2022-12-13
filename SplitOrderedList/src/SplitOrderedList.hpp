@@ -187,7 +187,7 @@ public:
     void ResetHPs() noexcept
     {
         for (auto& hp : m_hps)
-            hp.store(nullptr);
+            hp.store(nullptr, std::memory_order_release);
     }
 
     // I use UnmarkedPointers when ptr.load() special to wait-free:
@@ -298,7 +298,8 @@ public:
             new_node->m_next = curr;
             auto& node = prev == nullptr ? m_head : prev->m_next;
             Node* expected = curr;
-            if (node.compare_exchange_strong(expected, new_node))
+            if (node.compare_exchange_strong(expected, new_node,std::memory_order_release,
+                                                                std::memory_order_relaxed))
                 break;
         }
 
@@ -329,7 +330,7 @@ public:
             // TODO: Я не могу защщать HP маркерованный указатель, мне
             // нужно добавить в защиту демаркировку указателей [complete]
             curr = HPManager::Protect(curr->m_next, hps[1]);
-            hps[0].store(curr);
+            hps[0].store(curr, std::memory_order_release);
         }
 
         hp_mgr.ResetHPs();
@@ -366,10 +367,12 @@ public:
             bool is_already_marked = false;
             Node* next = nullptr;
             do {
-                next = UnmarkPointer(curr->m_next.load());
+                next = UnmarkPointer(curr->m_next.load(std::memory_order_relaxed));
                 Node* marked_next = MarkPointer(next);
                 // (1) Try to LOGIC remove
-                bool changed = curr->m_next.compare_exchange_strong(next, marked_next);
+                bool changed = curr->m_next.compare_exchange_strong(next, marked_next,
+                                                                    std::memory_order_release,
+                                                                    std::memory_order_relaxed);
                 if (changed)
                     break;
 
@@ -497,7 +500,7 @@ class SplitOrderedList
             while (curr != nullptr && curr->m_shah < shah)
             {
                 // Go to next
-                hps[0].store(curr);
+                hps[0].store(curr, std::memory_order_release);
                 prev = curr;
 
                 curr = HPManager::Protect(curr->m_next, hps[1]);
@@ -543,7 +546,7 @@ class SplitOrderedList
             while (curr != nullptr && curr->m_shah < shah)
             {
                 // Go to next
-                hps[0].store(curr);
+                hps[0].store(curr, std::memory_order_release);
                 prev = curr;
 
                 curr = HPManager::Protect(curr->m_next, hps[1]);
@@ -560,7 +563,7 @@ class SplitOrderedList
             NodeBase* expected = curr;
             if (node.compare_exchange_strong(expected, new_node))
             {
-                m_num_elems.fetch_add(1);
+                m_num_elems.fetch_add(1, std::memory_order_relaxed);
                 break;
             }
         }
@@ -636,6 +639,8 @@ public:
         }
     }
 
+    unsigned GetSize() const noexcept { return m_num_elems.load(); }
+
     void Insert(const T& value)
     {
         CheckOnRehash();
@@ -664,7 +669,7 @@ public:
         while (curr != nullptr && curr->m_shah < shah)
         {
             // Go to next
-            hps[0].store(curr);
+            hps[0].store(curr, std::memory_order_release);
             prev = curr;
 
             curr = HPManager::Protect(curr->m_next, hps[1]);
@@ -680,7 +685,7 @@ public:
             }
 
             // Go to next
-            hps[0].store(curr);
+            hps[0].store(curr, std::memory_order_release);
             prev = curr;
 
             curr = HPManager::Protect(curr->m_next, hps[1]);
@@ -712,7 +717,7 @@ public:
             while (curr != nullptr && curr->m_shah < shah)
             {
                 // Go to next
-                hps[0].store(curr);
+                hps[0].store(curr, std::memory_order_release);
                 prev = curr;
 
                 curr = HPManager::Protect(curr->m_next, hps[1]);
@@ -728,7 +733,7 @@ public:
                 }
 
                 // Go to next
-                hps[0].store(curr);
+                hps[0].store(curr, std::memory_order_release);
                 prev = curr;
 
                 curr = HPManager::Protect(curr->m_next, hps[1]);
@@ -742,10 +747,12 @@ public:
             NodeBase* next = nullptr;
             bool is_already_marked = false;
             while (true) {
-                next = UnmarkPointer(curr->m_next.load());
+                next = UnmarkPointer(curr->m_next.load(std::memory_order_relaxed));
                 NodeBase* marked_next = MarkPointer(next);
                 // (1) Try to LOGIC remove
-                bool changed = curr->m_next.compare_exchange_strong(next, marked_next);
+                bool changed = curr->m_next.compare_exchange_strong(next, marked_next,
+                                                                    std::memory_order_release,
+                                                                    std::memory_order_relaxed);
                 if (changed)
                     break;
 
@@ -763,11 +770,12 @@ public:
             NodeBase* expected = curr;
             if (node.compare_exchange_strong(expected, next))
             {
+                m_num_elems.fetch_sub(1, std::memory_order_relaxed);
                 erased_node = curr;
                 break;
             }
 
-            curr->m_next.store(next);
+            curr->m_next.store(next, std::memory_order_release);
         }
 
         hp_mgr.ResetHPs();
