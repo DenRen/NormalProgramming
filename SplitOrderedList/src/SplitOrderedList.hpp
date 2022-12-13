@@ -12,11 +12,20 @@
 namespace lf
 {
 
+#define ENABLE_DIFF_CL_FOR_HP_OPTIMIZATION
+
 template <typename T>
 struct HPStorageUniqList
 {
     constexpr static inline unsigned s_hp_per_thread = 2;
-    using HPs = std::array<std::atomic<T*>, s_hp_per_thread>;
+    using HPsBase = std::array<std::atomic<T*>, s_hp_per_thread>;
+    #ifndef ENABLE_DIFF_CL_FOR_HP_OPTIMIZATION
+        using HPs = HPsBase;
+    #else
+        struct alignas(64)
+        HPs : public HPsBase
+        {};
+    #endif
 
     std::vector<std::atomic<std::thread::id>> m_thread_id;
     std::vector<HPs> m_hazard_pointers;
