@@ -653,7 +653,7 @@ public:
         auto& hps = hp_mgr.GetHPs();
 
         hash_t hash = std::hash<T>{}(value);
-        hash_t shah = ReverseBitOrder(hash);
+        hash_t shah = ReverseBitOrder(hash) | 1;
         NodeSential* node_sent = GetNodeSential(hash);
 
         auto& head_line = node_sent->m_next;
@@ -671,15 +671,111 @@ public:
         }
 
         bool res = false;
-        if (curr != nullptr && curr->m_shah == shah)
-            res = ToReg(curr)->m_value == value;
+        while (curr != nullptr && curr->m_shah == shah)
+        {
+            if (ToReg(curr)->m_value == value)
+            {
+                res = true;
+                break;
+            }
+
+            // Go to next
+            hps[0].store(curr);
+            prev = curr;
+
+            curr = HPManager::Protect(curr->m_next, hps[1]);
+        }
 
         hp_mgr.ResetHPs();
 
         return res;
     }
 
-    void Erase(const T& value);
+    void Erase(const T& value)
+    {
+        HPManager& hp_mgr = GetHPManager();
+        auto& hps = hp_mgr.GetHPs();
+
+        hash_t hash = std::hash<T>{}(value);
+        hash_t shah = ReverseBitOrder(hash) | 1;
+        NodeSential* node_sent = GetNodeSential(hash);
+
+        auto& head_line = node_sent->m_next;
+
+        NodeBase* erased_node = nullptr;
+        while (true)
+        {
+            // Set head to hazard pointer
+            NodeBase* head = HPManager::Protect(head_line, hps[0]);
+            NodeBase* prev = nullptr;   // Protected by hps[0]
+            NodeBase* curr = head;      // Protected by hps[1]
+            while (curr != nullptr && curr->m_shah < shah)
+            {
+                // Go to next
+                hps[0].store(curr);
+                prev = curr;
+
+                curr = HPManager::Protect(curr->m_next, hps[1]);
+            }
+
+            bool finded = false;
+            while (curr != nullptr && curr->m_shah == shah)
+            {
+                if (ToReg(curr)->m_value == value)
+                {
+                    finded = true;
+                    break;
+                }
+
+                // Go to next
+                hps[0].store(curr);
+                prev = curr;
+
+                curr = HPManager::Protect(curr->m_next, hps[1]);
+            }
+
+            if (!finded)
+                break;
+
+            // Mark next pointer that insert cannot insert new node between
+            // curr->m_next and curr->m_next->m_next
+            NodeBase* next = nullptr;
+            bool is_already_marked = false;
+            while (true) {
+                next = UnmarkPointer(curr->m_next.load());
+                NodeBase* marked_next = MarkPointer(next);
+                // (1) Try to LOGIC remove
+                bool changed = curr->m_next.compare_exchange_strong(next, marked_next);
+                if (changed)
+                    break;
+
+                if (IsMarkedPointer(next))
+                {
+                    is_already_marked = true;
+                    break;
+                }
+            }
+            if (is_already_marked)
+                break;
+
+            auto& node = prev == nullptr ? head_line : prev->m_next;
+            // (2) Try from STRUCTURE remove
+            NodeBase* expected = curr;
+            if (node.compare_exchange_strong(expected, next))
+            {
+                erased_node = curr;
+                break;
+            }
+
+            curr->m_next.store(next);
+        }
+
+        hp_mgr.ResetHPs();
+
+        // (3) Try to PHYSIC remove
+        if (erased_node != nullptr)
+            hp_mgr.TryRelease(erased_node);
+    }
 
     void Dump() const
     {

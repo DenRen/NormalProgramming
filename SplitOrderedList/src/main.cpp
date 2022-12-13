@@ -82,7 +82,7 @@ void TestMultiThredinfList(int num_threads)
         }
         std::cout << "Test Insert\tpassed!\n";
     }}.join();
-    
+
     std::cout << std::endl;
     for (auto& th : threads)
     {
@@ -159,31 +159,78 @@ void TestUniqListNative()
     th.join();
 }
 
+void TestMultiThredingSOL(int num_threads)
+{
+    const int num_repeats = 30'000;
+    const int num_erase = 13'000;
+
+    lf::SplitOrderedList<int> list{(unsigned)num_threads};
+
+    std::vector<std::thread> threads;
+    for (int i_th = 0; i_th < num_threads; ++i_th)
+    {
+        threads.emplace_back([&list, num_repeats](){
+            for (int i = 0; i < num_repeats; ++i)
+            {
+                list.Insert(10 * i);
+                // std::cout << std::this_thread::get_id() << " inserted " << 10 * i << '\n';
+            }
+        });
+    }
+
+    for (auto& th : threads)
+        th.join();
+    std::cout << std::endl;
+    std::thread{[&list, num_repeats](){
+        for (int i = 0; i < num_repeats; ++i)
+        {
+            if (!list.Find(10 * i))
+            {
+                std::cout << "Test Insert\tfailed!\n";
+                return;
+            }
+            // std::cout << std::this_thread::get_id() << " finded " << 10 * i << '\n';
+        }
+        std::cout << "Test Insert\tpassed!\n";
+    }}.join();
+
+    std::cout << std::endl;
+    for (auto& th : threads)
+    {
+        th = std::thread{[&list, num_repeats](){
+            // const auto id = std::this_thread::get_id();
+            for (int i = 0; i < num_erase; ++i)
+            {
+                // std::cout << id << " beg erased " << 10 * i << '\n';
+                list.Erase(10 * i);
+                // std::cout << id << " end erased " << 10 * i << '\n';
+            }
+        }};
+    }
+
+    for (auto& th : threads)
+        th.join();
+
+    std::cout << "Erase ended\n";
+
+    std::cout << std::endl;
+    std::thread{[&list, num_repeats](){
+        for (int i = 0; i < num_repeats; ++i)
+        {
+            auto res = list.Find(10 * i);
+            if ((i <  num_erase && res == true) ||
+                (i >= num_erase && res == false))
+            {
+                std::cout << "Test Erase\tfailed!\n";
+                return;
+            }
+        }
+        std::cout << "Test Erase\tpassed!\n";
+    }}.join();
+}
+
 int main(int argc, char* argv[])
 {
-    lf::SplitOrderedList<int> sol{16};
-
-    std::thread {
-        [&sol]() {
-            for (int i = 0; i < 40; ++i)
-                sol.Insert(i);
-
-            sol.Insert(7);
-            sol.Dump();
-            std::cout << std::endl;
-
-            sol.Insert(3);
-
-            sol.Dump();
-            std::cout << std::endl;
-        }
-    }.join();
-    
-
-
-
-    return 0;
-
     int num_threads = argc == 2 ? atoi(argv[1]) : -1;
     if (num_threads <= 0)
     {
@@ -191,7 +238,7 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-
+    TestMultiThredingSOL(num_threads);
 
     return 0;
 }
